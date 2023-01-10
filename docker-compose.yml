@@ -1,0 +1,62 @@
+version: '3'
+
+services:
+  jenkins:
+    image: jenkins-ansible
+    container_name: jenkins
+    build:
+      context: jenkins-ansible
+    ports:
+      - 8080:8080
+    volumes:
+      - "$PWD/jenkins_home:/var/jenkins_home"
+    networks:
+      - net
+  remote_host:
+    image: remote-host
+    container_name: remote-host
+    build:
+      context: centos7
+    volumes:
+      - "$PWD/backup-mysql-to-aws.sh:/tmp/backup-mysql-to-aws.sh"
+    networks:
+      - net
+  db_host:
+    image: mysql:5.7
+    container_name: db
+    platform: linux/x86_64
+    environment:
+      - "MYSQL_ROOT_PASSWORD=1234"
+    volumes:
+      - "$PWD/db_data:/var/lib/mysql"
+    networks:
+      - net
+  web:
+    image: ansible-web
+    container_name: web
+    build:
+      context: jenkins-ansible/web
+    ports:
+      - 80:80
+    networks:
+      - net
+  git-server:
+    image: 'yrzr/gitlab-ce-arm64v8:latest'
+    container_name: git-server
+    hostname: 'gitlab.example.com'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.example.com:8929'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+    ports:
+      - '8929:8929'
+      - '2224:22'
+    volumes:
+      - '$GITLAB_HOME/config:/etc/gitlab'
+      - '$GITLAB_HOME/logs:/var/log/gitlab'
+      - '$GITLAB_HOME/data:/var/opt/gitlab'
+    shm_size: '256m'
+    networks:
+      - net
+networks:
+  net:
